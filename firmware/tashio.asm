@@ -270,6 +270,8 @@ IntTimeoutTimer
 
 IntAdc
 	bcf	PIR1,ADIF	;Clear the interrupt
+	movlb	2		;Turn LED off if it was on; this is a convenient
+	bsf	LEDPORT,LEDPIN	; place to do it so it flashes brightly when on
 	movlb	1		;Switch off by which source's conversion just
 	movf	ADCON0,W	; finished
 	andlw	0x7C		; "
@@ -364,10 +366,12 @@ Init
 	banksel	LATA		;Ready to pull ADB low when output
 	bcf	ADBPORT,ADBPIN
 
-	banksel	TRISA		;All pins inputs to start with
+	banksel	TRISA		;All pins inputs to start with except LED
 	movlw	B'00111111'
 	movwf	TRISA
 	movwf	TRISC
+	movlw	~(1 << LEDPIN)
+	andwf	LEDPORT,F
 
 	banksel	PIE1		;Timer2 and ADC interrupts enabled
 	movlw	(1 << TMR2IE) | (1 << ADIE)
@@ -417,8 +421,6 @@ AdbReset
 	;fall through
 
 Main
-	movlb	2		;Turn LED off if it was on
-	bsf	LEDPORT,LEDPIN	; "
 	btfsc	AP_FLAG,AP_RST	;Branch to reset if a reset was received, else
 	bra	AdbReset	; wait until a command was received
 	btfss	AP_FLAG,AP_RXCI	; "
@@ -907,15 +909,15 @@ AdbTalk3
 	movf	ADB_R3H,W	;Load the high byte of register 3 for transmit,
 	andlw	B'01110000'	; clearing the MSB (which we use as a collision
 	movwf	AP_BUF		; flag) and the address
-	movlb	0		;Get a pseudorandom four-bit number and put it
-	movf	TMR1H,W		; into the low two bits of the buffer; this way
-	xorwf	TMR1L,W		; we replace part of address (which the host
-	andlw	B'00000011'	; already knows) with a random number, which
-	iorwf	AP_BUF,F	; helps with collision detection
+	movlb	0		;Get two pseudorandom bits and put them into the
+	movf	TMR1H,W		; buffer; this way we replace part of address
+	xorwf	TMR1L,W		; (which the host already knows) with a random
+	andlw	B'00000011'	; number, which helps with collision detection
 	btfsc	U0_PORT,U0_PIN	;Copy the unit number into bits 2 and 3 of the
 	iorlw	B'00000100'	; buffer; this is nonstandard but it serves as a
 	btfsc	U1_PORT,U1_PIN	; way to allow four of these devices to be
 	iorlw	B'00001000'	; addressed by the Mac
+	iorwf	AP_BUF,F	; "
 	bsf	AP_FLAG,AP_TXI	;Raise the flag to transmit the byte
 ATalk30	btfss	AP_FLAG,AP_RST	;If the flag is up for a reset or a command,
 	btfsc	AP_FLAG,AP_RXCI	; break off transmitting and return to main
