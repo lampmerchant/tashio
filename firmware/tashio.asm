@@ -27,6 +27,7 @@
 
 	list		P=PIC16F1704, F=INHX32, ST=OFF, MM=OFF, R=DEC, X=ON
 	#include	P16F1704.inc
+	errorlevel	-302	;Suppress "register not in bank 0" messages
 	__config	_CONFIG1, _FOSC_INTOSC & _WDTE_OFF & _PWRTE_ON & _MCLRE_OFF & _CP_OFF & _BOREN_OFF & _CLKOUTEN_OFF & _IESO_OFF & _FCMEN_OFF
 			;_FOSC_INTOSC	Internal oscillator, I/O on RA5
 			;_WDTE_OFF	Watchdog timer disabled
@@ -327,8 +328,8 @@ Init
 	movlw	B'01010100'	; thus ticking every 4 us; weak pull-ups on
 	movwf	OPTION_REG
 
-	banksel	T1CON		;Timer1 ticks once per instruction cycle
-	movlw	B'00000001'
+	banksel	T1CON		;Timer1 ticks once per instruction cycle,
+	movlw	B'00000001'	; overflowing every 8.192 ms
 	movwf	T1CON
 
 	banksel	T2CON		;Timer2 on with 1:64 pre and 1:10 postscaler and
@@ -337,18 +338,12 @@ Init
 	movlw	249
 	movwf	PR2
 
-	banksel	T4CON		;Timer4 on with 1:64 prescaler and maximum
-	movlw	B'00000111'	; period, making it match every 2.048 ms
-	movwf	T4CON
-	movlw	255
-	movwf	PR4
-
 	banksel	ADCON0		;ADC is left justified since we treat it as
 	movlw	B4_ADCN		; 8-bit, clock is Fosc/64, references are Vss
 	movwf	ADCON0		; and Vdd to start with, starts conversion on
-	movlw	B'01100000'	; Timer4 match
+	movlw	B'01100000'	; Timer1 overflow
 	movwf	ADCON1
-	movlw	B'11000000'
+	movlw	B'01000000'
 	movwf	ADCON2
 
 	banksel	ANSELA		;All pins digital, not analog to start with
@@ -943,7 +938,7 @@ ATalk32	bsf	ADB_R3H,7	;We collided, so set the collision flag
 
 ;;; State Machines ;;;
 
-AdbFsa	org	0xF00
+AdbFsa	org	0x700
 
 AdbFsaIdle
 	clrf	TMR0		;Reset timer
