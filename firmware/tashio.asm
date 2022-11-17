@@ -74,6 +74,8 @@ ADBPIN	equ	RA5	; "
 
 LEDPORT	equ	PORTC	;Pin where LED is connected
 LEDPIN	equ	RC4	; "
+LEDOPPS	equ	0x14	; "
+LEDIPPS	equ	RC4PPS	; "
 
 U0_PORT	equ	PORTA	;Pins where unit-select jumpers are connected
 U0_PIN	equ	RA3	; "
@@ -271,8 +273,6 @@ IntTimeoutTimer
 
 IntAdc
 	bcf	PIR1,ADIF	;Clear the interrupt
-	movlb	2		;Turn LED off if it was on; this is a convenient
-	bsf	LEDPORT,LEDPIN	; place to do it so it flashes brightly when on
 	movlb	1		;Switch off by which source's conversion just
 	movf	ADCON0,W	; finished
 	andlw	0x7C		; "
@@ -368,6 +368,14 @@ Init
 	movlw	~(1 << LEDPIN)
 	andwf	LEDPORT,F
 
+	banksel	LEDIPPS		;CCP1 input to LED pin (this shouldn't be
+	movlw	B'00001100'	; necessary but odd things happen when you don't
+	movwf	LEDIPPS		; set both input and output on the PPS)
+
+	banksel	CCP1PPS		;CCP1 output to LED pin
+	movlw	LEDOPPS
+	movwf	CCP1PPS
+
 	banksel	PIE1		;Timer2 and ADC interrupts enabled
 	movlw	(1 << TMR2IE) | (1 << ADIE)
 	movwf	PIE1
@@ -442,8 +450,6 @@ Main
 	bra	Main		; "
 
 AdbCmd
-	movlb	2		;Device has been hailed, turn LED on
-	bcf	LEDPORT,LEDPIN	; "
 	movf	AP_BUF,W	;Switch handler by the low four bits of the
 	andlw	B'00001111'	; command
 	brw			; "
@@ -465,6 +471,7 @@ AdbCmd
 	goto	AdbTalk3	; "
 
 AdbListen1
+	call	BlinkLed	;Device has been hailed, blink the LED
 	btfss	AP_FLAG,AP_RST	;If the flag is up for a reset or a command,
 	btfsc	AP_FLAG,AP_RXCI	; break off receiving and return to main
 	goto	Main		; "
@@ -569,6 +576,7 @@ ALstn13	movlb	3		;In 2-AD mode (0b10), 1-2 analog, 3-4 digital
 	goto	Main		;Return to main
 
 AdbListen2
+	call	BlinkLed	;Device has been hailed, blink the LED
 	btfss	AP_FLAG,AP_RST	;If the flag is up for a reset or a command,
 	btfsc	AP_FLAG,AP_RXCI	; break off receiving and return to main
 	goto	Main		; "
@@ -679,6 +687,7 @@ ALstn28	btfss	AP_FLAG,AP_RST	;If the flag is up for a reset or a command,
 	goto	Main		;Return to main
 
 AdbListen3
+	call	BlinkLed	;Device has been hailed, blink the LED
 	btfss	AP_FLAG,AP_RST	;If the flag is up for a reset or a command,
 	btfsc	AP_FLAG,AP_RXCI	; break off receiving and return to main
 	goto	Main		; "
@@ -720,6 +729,7 @@ AdbTalk0
 	;fall through
 
 AdbTalk1
+	call	BlinkLed	;Device has been hailed, blink the LED
 	bcf	FLAGS,F_PBCHG	;Port B is being read, so clear change flag
 	movlw	B'00010000'	;If the ADC is set to use an external voltage
 	movlb	1		; reference, we're always in 3-AD mode
@@ -822,6 +832,7 @@ ATalk15	btfss	AP_FLAG,AP_RST	;If the flag is up for a reset or a command,
 	goto	Main		;Return to main when it is
 
 AdbTalk2
+	call	BlinkLed	;Device has been hailed, blink the LED
 	movlb	0		;Bits 5 and 4 are always 1 when reading port A,
 	movlw	B'00110000'	; since it's always digital
 	btfsc	U1_PORT,U1_PIN	;Bits 7 and 6 are the unit number
@@ -901,6 +912,7 @@ AD0Tk24	btfss	AP_FLAG,AP_RST	;If the flag is up for a reset or a command,
 	goto	Main		;Return to main when it is
 
 AdbTalk3
+	call	BlinkLed	;Device has been hailed, blink the LED
 	movf	ADB_R3H,W	;Load the high byte of register 3 for transmit,
 	andlw	B'01110000'	; clearing the MSB (which we use as a collision
 	movwf	AP_BUF		; flag) and the address
@@ -934,6 +946,16 @@ ATalk31	btfss	AP_FLAG,AP_RST	;If the flag is up for a reset or a command,
 	goto	Main		;Return to main when it is
 ATalk32	bsf	ADB_R3H,7	;We collided, so set the collision flag
 	goto	Main		;Return to main
+
+BlinkLed
+	movlb	0		;Set CCP1 to output a zero for ~8 ms then a one;
+	movf	TMR1H,W		; this blinks the LED on for long enough that it
+	movlb	5		; has a chance to light up brightly
+	movwf	CCPR1H		; "
+	clrf	CCPR1L		; "
+	clrf	CCP1CON		; "
+	bsf	CCP1CON,CCP1M3	; "
+	return
 
 
 ;;; State Machines ;;;
