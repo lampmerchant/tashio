@@ -2,6 +2,9 @@
 
 Clone of BeeHive Technologies's ADB I/O, a device for automation, control, and interfacing with sensors or other devices, using a PIC16F1704.  See the [manual](https://web.archive.org/web/19980501032801/http://www.bzzzzzz.com:80/BeeHive/ADB_IO/Downloads/ADB_IO_manual.pdf) for more information about ADB I/O.
 
+
 ## Building Firmware
 
 Building the firmware requires Microchip MPASM, which is included with their development environment, MPLAB.  Note that you **must** use MPLAB X version 5.35 or earlier or MPLAB 8 as later versions of MPLAB X have removed MPASM.
+
+The firmware can also be built using gpasm, an MPASM-compatible assembler that is part of the [gputils](https://gputils.sourceforge.io/) project.  Please note, however, that the release builds are built using MPASM and compatibility with gpasm is not tested.
